@@ -160,6 +160,48 @@ def group_words(words: list[Word], measure: TextMeasure, max_width: float, max_l
     return out
 
 
+_SENTENCE_END = tuple(".?!。？！")
+_CLAUSE_END = tuple(",，、;；:：")
+
+
+def _split_cue(text: str, measure: TextMeasure, max_width: float, max_lines: int,
+               memo: dict | None = None) -> list[str]:
+    """Split text that needs more than ``max_lines`` lines into the fewest pieces that each fit.
+
+    Among those, a cut after a sentence end wins, then after a comma, 、 or ，, then the most
+    even split. ``memo`` holds the answer for each tail already solved, so the search stays
+    quadratic in the number of words instead of trying every combination.
+    """
+    memo = {} if memo is None else memo
+    if text in memo:
+        return memo[text]
+    rows = measure.wrap(text, max_width)
+    if len(rows) <= max_lines:
+        return [text]
+    tokens, sep = measure._tokens(text)
+    fits = lambda t: len(measure.wrap(t, max_width)) <= max_lines  # noqa: E731
+    pieces_needed = -(-len(rows) // max_lines)
+
+    # Every cut that leaves a left side fitting, scored: fewest pieces in all, then a cut after
+    # a sentence end, then after a clause mark, then the most even split.
+    total = measure.width(text)
+    best, best_key = None, None
+    for i in range(1, len(tokens)):
+        left, right = sep.join(tokens[:i]).strip(), sep.join(tokens[i:]).strip()
+        if not fits(left):
+            break  # a longer left side cannot fit either
+        if not left or not right:
+            continue
+        rest = _split_cue(right, measure, max_width, max_lines, memo)
+        mark = tokens[i - 1].rstrip()
+        kind = 0 if mark.endswith(_SENTENCE_END) else 1 if mark.endswith(_CLAUSE_END) else 2
+        key = (1 + len(rest), kind, abs(measure.width(left) - total / pieces_needed))
+        if best_key is None or key < best_key:
+            best, best_key = [left] + rest, key
+    memo[text] = best or [sep.join(rows[i:i + max_lines]) for i in range(0, len(rows), max_lines)]
+    return memo[text]
+
+
 def fit_lines(lines: list[Line], measure: TextMeasure, max_width: float, max_lines: int = 2) -> list[Line]:
     """Fit each cue into ``max_lines`` balanced lines; a longer cue becomes several, sharing its time by length."""
     out = []
@@ -168,15 +210,7 @@ def fit_lines(lines: list[Line], measure: TextMeasure, max_width: float, max_lin
         if len(rows) <= max_lines:
             out.append(Line(line.start, line.end, "\n".join(measure.balance(line.text, max_width, max_lines))))
             continue
-        sep = " " if " " in line.text else ""
-        chunks: list[str] = []
-        # Sentences first, so a cue holding two sentences splits between them.
-        for sentence in re.split(r"(?<=[.?!。？！])\s+", line.text.strip()):
-            if chunks and len(measure.wrap(chunks[-1] + sep + sentence, max_width)) <= max_lines:
-                chunks[-1] += sep + sentence
-                continue
-            rows = measure.wrap(sentence, max_width)
-            chunks += [sep.join(rows[i:i + max_lines]) for i in range(0, len(rows), max_lines)]
+        chunks = _split_cue(line.text.strip(), measure, max_width, max_lines)
         total = sum(len(c) for c in chunks) or 1
         t = line.start
         for chunk in chunks:

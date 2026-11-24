@@ -8,7 +8,7 @@ from shorts_safezone import Box, check_box
 
 from talk2shorts.captions import Line, Word, fit_lines, group_words, read_srt, write_srt
 from talk2shorts.cli import main
-from talk2shorts.fonts import TextMeasure
+from talk2shorts.fonts import TextMeasure, detect_script, graphemes
 from talk2shorts.layout import H, caption_slot, title_slot
 from talk2shorts.media import Probe, parse_time, probe
 from talk2shorts.render import crop_size
@@ -95,6 +95,49 @@ def test_fit_lines_splits_between_sentences():
     measure = TextMeasure(None, 58)
     out = fit_lines([Line(0, 4, "우주에서 사는 건 어떤 느낌일까요? 매일이 새로운 경험입니다")], measure, 560, 2)
     assert [l.text.replace("\n", " ") for l in out] == ["우주에서 사는 건 어떤 느낌일까요?", "매일이 새로운 경험입니다"]
+
+
+@pytest.mark.parametrize("text, language, script", [
+    ("안녕하세요 world", None, "ko"),
+    ("こんにちは、今日は", None, "ja"),
+    ("今日は天気", "ja", "ja"),          # Han alone reads as Chinese unless told otherwise
+    ("今天天气很好", None, "zh"),
+    ("नमस्ते दुनिया", None, "hi"),
+    ("مرحبا بالعالم", None, "ar"),
+    ("สวัสดีครับ", None, "th"),
+    ("Привет мир", None, "latin"),
+    ("Olá mundo", None, "latin"),
+])
+def test_detect_script(text, language, script):
+    assert detect_script(text, language) == script
+
+
+def test_graphemes_keep_thai_and_devanagari_marks_with_their_letter():
+    assert graphemes("สวัสดี") == ["ส", "วั", "ส", "ดี"]
+    assert graphemes("नमस्ते") == ["न", "म", "स्", "ते"]
+
+
+def test_wrap_never_starts_a_cjk_line_with_closing_punctuation():
+    m = TextMeasure(None, 58)
+    for width in range(300, 700, 20):
+        for row in m.wrap("こんにちは、今日は宇宙での生活について話します。", width)[1:]:
+            assert row[0] not in "、。，", (width, row)
+
+
+def test_wrap_splits_a_long_unspaced_run_between_letters():
+    m = TextMeasure(None, 58)
+    rows = m.wrap("สวัสดีครับ วันนี้เราจะคุยกันเรื่องชีวิตในอวกาศ", 500)
+    assert all(m.width(r) <= 500 for r in rows)
+    assert "".join(rows).replace(" ", "") == "สวัสดีครับวันนี้เราจะคุยกันเรื่องชีวิตในอวกาศ"
+
+
+def test_fit_lines_uses_the_fewest_pieces():
+    m = TextMeasure(None, 58)
+    text = "Hello there, today we will talk about life in space and the experiments we run."
+    out = fit_lines([Line(0, 4, text)], m, 560, 2)
+    fewest = -(-len(m.wrap(text, 560)) // 2)
+    assert len(out) == fewest
+    assert all(len(l.text.split()) >= 3 for l in out)  # no stray one- or two-word piece
 
 
 @pytest.mark.parametrize("height", [100, 173])

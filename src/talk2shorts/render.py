@@ -69,7 +69,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,{style.font_name},{style.caption_size},&H00FFFFFF,&H00FFFFFF,&H{box:02X}000000,&H{box:02X}000000,-1,0,0,0,100,100,0,0,{3 if style.box_opacity > 0 else 1},{14 if style.box_opacity > 0 else 3},0,2,0,0,0,1
+Style: Caption,{style.font_name},{style.caption_size},&H00FFFFFF,&H00FFFFFF,{"&HFF000000" if style.box_opacity > 0 else "&H00000000"},&H{box:02X}000000,-1,0,0,0,100,100,0,0,{4 if style.box_opacity > 0 else 1},{14 if style.box_opacity > 0 else 3},0,2,0,0,0,1
 Style: Title,{style.font_name},{style.title_size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,8,0,0,0,1
 
 [Events]

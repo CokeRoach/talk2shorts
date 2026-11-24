@@ -1,5 +1,7 @@
 # talk2shorts
 
+**English** · [한국어](docs/README.ko.md) · [日本語](docs/README.ja.md) · [中文](docs/README.zh.md) · [Português](docs/README.pt.md) · [हिन्दी](docs/README.hi.md) · [Bahasa Indonesia](docs/README.id.md) · [Français](docs/README.fr.md) · [Русский](docs/README.ru.md)
+
 Turn a section of a horizontal talk, lecture or interview into a vertical short, in one command. The crop follows the speaker, the captions are written from the speech and placed where **YouTube Shorts, TikTok and Instagram Reels buttons will not cover them**, and the sound is set to -14 LUFS.
 
 <p align="center">
@@ -65,17 +67,34 @@ An empty list means clear on that platform. The command exits with 1 when any te
 | `--language` | detected | Spoken language code, such as `en`, `ko`, `ja` |
 | `--lines` | `2` | Lines per caption, 1 or 2 |
 | `--platforms` | `all` | `youtube`, `tiktok`, `reels`, or a comma list |
-| `--font` | a bold system font with Korean, Japanese and Chinese | A font file for captions and title |
+| `--font` | a bold system font for the script | A font file for captions and title |
 | `--no-track` | off | Keep the crop centred |
 | `--no-captions` | off | No captions |
 
 A GPU speeds up speech recognition when faster-whisper's CUDA libraries are installed; without them talk2shorts falls back to the CPU on its own.
+
+## Languages
+
+Speech recognition covers the languages faster-whisper knows (about 99). The caption font follows the script being written, so every language gets a bold face that has its letters:
+
+| Script | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Korean | Malgun Gothic | Apple SD Gothic Neo | Noto Sans CJK |
+| Japanese | Yu Gothic | Hiragino Sans | Noto Sans CJK |
+| Chinese | Microsoft YaHei | PingFang | Noto Sans CJK |
+| Hindi (Devanagari) | Nirmala UI | Kohinoor | Noto Sans Devanagari |
+| Arabic | Segoe UI | Geeza Pro | Noto Sans Arabic |
+| Thai | Leelawadee UI | Thonburi | Noto Sans Thai |
+| Latin, Cyrillic | Segoe UI | Helvetica Neue | Noto Sans |
+
+Han characters alone are read as Chinese; pass `--language ja` for Japanese written without kana. Arabic is laid out right to left. Captions break after sentence ends and commas (、 and ，too), never start a line with closing punctuation, and keep Thai and Devanagari vowel signs with their letter. Use `--font` to choose your own.
 
 ## Limits
 
 - One speaker in frame works best. With two people side by side the crop follows the larger face.
 - Subtitles already burned into the source stay in the picture.
 - When the speaker's head is near the top of the frame, a title may cover it; the report says so (`title_covers_face`). A shorter, one-line title helps.
+- Thai is written without spaces between words, and talk2shorts has no Thai dictionary, so a long Thai line can break inside a word.
 - Speech recognition makes mistakes, especially with names. Read the `.srt` and re-render with `--srt` after fixing it.
 
 ## Development

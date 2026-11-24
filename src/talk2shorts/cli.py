@@ -12,7 +12,7 @@ from shorts_safezone import PLATFORMS, Box, check_box
 
 from . import __version__
 from .captions import fit_lines, group_words, read_srt, transcribe, write_srt
-from .fonts import TextMeasure, find_font
+from .fonts import TextMeasure, detect_script, find_font, load_font
 from .layout import caption_slot, title_slot
 from .media import loudness, parse_time, probe
 from .render import Plan, Style, crop_size, render
@@ -60,11 +60,7 @@ def run(args) -> dict:
     duration = end - start
     out = Path(args.output) if args.output else src.with_name(src.stem + "_short.mp4")
 
-    font_path = find_font(args.font)
     style = Style(caption_size=args.caption_size)
-    if font_path:
-        from PIL import ImageFont
-        style.font_name = ImageFont.truetype(str(font_path), 20).getname()[0]
     crop_w, _ = crop_size(info)
     share = crop_w / info.width
 
@@ -83,16 +79,29 @@ def run(args) -> dict:
             face_top = float(np.nanpercentile(tops, 10)) * info.height * 1920 / crop_h
 
     plan = Plan(source=src, start=start, duration=duration, probe=info, centres=centres)
-    measure = TextMeasure(font_path, style.caption_size)
     line_h = round(style.caption_size * 1.25 * args.lines + 28)
+    raw_lines, words = [], []
     if not args.no_captions:
         print("[2/4] captions", file=sys.stderr)
+        if args.srt:
+            raw_lines = read_srt(args.srt, start, duration)
+        else:
+            words = transcribe(src, start, duration, model=args.model, language=args.language)
+
+    # The font follows the script being written: Yu Gothic for Japanese, Nirmala UI for Hindi...
+    sample = " ".join([l.text for l in raw_lines] + [w.text for w in words] + [args.title or ""])
+    script = detect_script(sample, args.language)
+    font_path = find_font(args.font, script)
+    if font_path:
+        style.font_name = load_font(font_path, 20).getname()[0]
+    measure = TextMeasure(font_path, style.caption_size)
+
+    if not args.no_captions:
         slot = caption_slot(args.platforms, line_h)
         max_w = slot.width - 40
         if args.srt:
-            lines = fit_lines(read_srt(args.srt, start, duration), measure, max_w, args.lines)
+            lines = fit_lines(raw_lines, measure, max_w, args.lines)
         else:
-            words = transcribe(src, start, duration, model=args.model, language=args.language)
             lines = group_words(words, measure, max_w, max_lines=args.lines)
         plan.captions, plan.caption_slot = lines, slot
     if args.title:
@@ -113,7 +122,8 @@ def run(args) -> dict:
 
     print("[4/4] checking the result", file=sys.stderr)
     report = {"output": str(out), "duration": round(duration, 2), "face_found_share": found,
-              "crop": info_render["crop"], "captions": len(plan.captions)}
+              "crop": info_render["crop"], "captions": len(plan.captions),
+              "script": script, "font": style.font_name}
     if plan.caption_slot:
         widest = max((measure.width(row) for l in plan.captions for row in l.text.split("\n")), default=0) + 28
         s = plan.caption_slot
