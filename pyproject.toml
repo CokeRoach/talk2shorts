@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "talk2shorts"
+dynamic = ["version"]
+description = "Turn a section of a horizontal talk, lecture or interview into a vertical short: the crop follows the speaker, captions stay clear of YouTube Shorts, TikTok and Reels buttons, sound at -14 LUFS."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "CokeRoach" }]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "opencv-python-headless>=4.8",
+  "pillow>=10",
+  "shorts-safezone>=0.1.1",
+]
+keywords = ["shorts", "youtube shorts", "tiktok", "reels", "vertical video", "captions", "reframe", "ffmpeg", "whisper"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Video",
+]
+
+[project.urls]
+Homepage = "https://github.com/CokeRoach/talk2shorts"
+Issues = "https://github.com/CokeRoach/talk2shorts/issues"
+
+[project.scripts]
+talk2shorts = "talk2shorts.cli:main"
+
+[project.optional-dependencies]
+captions = ["faster-whisper>=1.1"]
+test = ["pytest>=7"]
+
+[tool.hatch.version]
+path = "src/talk2shorts/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/talk2shorts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

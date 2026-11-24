@@ -1,0 +1,38 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      # A bundled ffmpeg from PyPI: the same on every OS, and no apt or brew mirror to hang on.
+      - name: Put ffmpeg on PATH
+        timeout-minutes: 5
+        shell: python
+        run: |
+          import os, shutil, subprocess, sys
+          subprocess.run([sys.executable, "-m", "pip", "install", "imageio-ffmpeg"], check=True)
+          import imageio_ffmpeg
+          bin_dir = os.path.join(os.environ["RUNNER_TEMP"], "ffmpeg-bin")
+          os.makedirs(bin_dir, exist_ok=True)
+          name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+          shutil.copy(imageio_ffmpeg.get_ffmpeg_exe(), os.path.join(bin_dir, name))
+          os.chmod(os.path.join(bin_dir, name), 0o755)
+          with open(os.environ["GITHUB_PATH"], "a") as f:
+              f.write(bin_dir + "\n")
+      - run: python -m pip install ".[test]"
+      - run: python -m pytest -q -rs
