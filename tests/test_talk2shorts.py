@@ -140,6 +140,18 @@ def test_crop_follows_a_real_move_and_stays_inside():
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_probe_works_without_ffprobe(tmp_path, monkeypatch):
+    src = tmp_path / "clip.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=3",
+                    "-f", "lavfi", "-i", "sine=d=3", "-pix_fmt", "yuv420p", "-shortest", str(src)], check=True)
+    real_which = shutil.which
+    monkeypatch.setattr(shutil, "which", lambda name: None if name == "ffprobe" else real_which(name))
+    p = probe(src)
+    assert (p.width, p.height, p.fps, p.has_audio) == (640, 360, 25.0, True)
+    assert abs(p.duration - 3) < 0.1
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
 def test_end_to_end_with_srt(tmp_path, capsys):
     src = tmp_path / "talk.mp4"
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=1280x720:r=30:d=8",

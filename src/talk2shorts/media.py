@@ -29,6 +29,8 @@ class Probe:
 
 
 def probe(path: str | Path) -> Probe:
+    if shutil.which("ffprobe") is None:
+        return _probe_with_ffmpeg(path)
     out = subprocess.run(
         [tool("ffprobe"), "-v", "error", "-print_format", "json", "-show_streams", "-show_format", str(path)],
         capture_output=True, text=True, encoding="utf-8",
@@ -52,6 +54,25 @@ def probe(path: str | Path) -> Probe:
         duration=float(data["format"].get("duration", video.get("duration", 0)) or 0),
         has_audio=any(s.get("codec_type") == "audio" for s in data["streams"]),
     )
+
+
+def _probe_with_ffmpeg(path: str | Path) -> Probe:
+    """The same facts from ``ffmpeg -i``, for installs that ship ffmpeg without ffprobe."""
+    err = subprocess.run([tool("ffmpeg"), "-hide_banner", "-i", str(path)],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
+    video = re.search(r"Stream #\S+.*?: Video: .*", err)
+    if not video:
+        raise RuntimeError(f"ffmpeg could not read a video stream from {path}")
+    size = re.search(r"(\d{2,5})x(\d{2,5})", video.group(0))
+    fps = re.search(r"([\d.]+) fps", video.group(0)) or re.search(r"([\d.]+) tbr", video.group(0))
+    dur = re.search(r"Duration: (\d+):(\d+):([\d.]+)", err)
+    w, h = int(size.group(1)), int(size.group(2))
+    rot = re.search(r"rotation of (-?[\d.]+) degrees", err)
+    if rot and round(abs(float(rot.group(1)))) % 180 == 90:
+        w, h = h, w
+    duration = int(dur.group(1)) * 3600 + int(dur.group(2)) * 60 + float(dur.group(3)) if dur else 0.0
+    return Probe(width=w, height=h, fps=float(fps.group(1)) if fps else 30.0, duration=duration,
+                 has_audio=bool(re.search(r"Stream #\S+.*?: Audio:", err)))
 
 
 def sample_frames(path: str | Path, start: float, duration: float, every: float, width: int):
